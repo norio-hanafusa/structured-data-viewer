@@ -1,49 +1,49 @@
 # Structured Data Viewer
 
-JSON / YAML / XML / HTML に対応したブラウザベースの構造化データビューアです。単一の HTML ファイルで動作し、インストール不要で使えます。
+A browser-based structured data viewer supporting JSON, JSON Lines, YAML, XML, and HTML. Runs as a single HTML file with no installation required.
 
-## 機能
+## Features
 
-- **マルチフォーマット対応** — JSON, YAML, XML, HTML の読み込み・表示
-- **ツリービュー / テーブルビュー** — データ構造を2つの視点で閲覧
-- **インライン編集** — 値の編集、項目の追加・削除をGUI上で実行
-- **ドラッグ＆ドロップ** — ファイルをドロップして即座に読み込み
-- **整形・書き出し** — データの整形(フォーマット)とファイルエクスポート
-- **Undo / Redo** — 編集履歴の管理 (Ctrl+Z / Ctrl+Y)
-- **ダーク / ライトテーマ** — Catppuccin カラーパレットによる美しいUI
-- **統計表示** — キー数、深さ、ノード数、ユニークキー数、サイズをリアルタイム表示
-- **レスポンシブ対応** — デスクトップ・モバイルどちらでも利用可能
+- **Multi-format support** — Read and display JSON, JSONL (JSON Lines / NDJSON), YAML, XML, and HTML
+- **Tree view / Table view** — Browse data structures from two perspectives
+- **Inline editing** — Edit values, add and delete items directly in the GUI
+- **Drag & drop** — Drop files to load them instantly
+- **Format & export** — Pretty-print data and export to file
+- **Undo / Redo** — Edit history management (Ctrl+Z / Ctrl+Y)
+- **Dark / Light theme** — Beautiful UI powered by the Catppuccin color palette
+- **Statistics** — Real-time display of key count, depth, node count, unique keys, and size
+- **Responsive** — Works on both desktop and mobile
 
-## デモ
+## Demo
 
 https://norio-hanafusa.github.io/structured-data-viewer/index.html
 
-## 使い方
+## Usage
 
-`structured-data-viewer.html` をブラウザで開くだけで利用できます。
+Simply open `structured-data-viewer.html` in your browser.
 
-1. 左のエディタに JSON / YAML / XML / HTML を貼り付け
-2. フォーマットタブで入力形式を選択
-3. 「プレビュー」をクリックして表示
+1. Paste JSON / JSONL / YAML / XML / HTML into the editor on the left
+2. Select the input format using the format tabs
+3. Click "Preview" to display
 
-## 開発について
+## Development
 
-このプロジェクトは ChatGPT, Gemini, Claude を活用した Vibe Coding で作成されました。
+This project was created through Vibe Coding using ChatGPT, Gemini, and Claude.
 
-## 外部ライブラリ
+## External Libraries
 
-| ライブラリ | 用途 | ライセンス |
+| Library | Purpose | License |
 |---|---|---|
-| [js-yaml](https://github.com/nodeca/js-yaml) | YAML パース | MIT |
-| [Google Fonts](https://fonts.google.com/) (JetBrains Mono, Noto Sans JP) | フォント | [SIL Open Font License](https://scripts.sil.org/OFL) / [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) |
+| [js-yaml](https://github.com/nodeca/js-yaml) | YAML parsing | MIT |
+| [Google Fonts](https://fonts.google.com/) (JetBrains Mono, Noto Sans JP) | Fonts | [SIL Open Font License](https://scripts.sil.org/OFL) / [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) |
 
-## カラーパレット
+## Color Palette
 
-UIのカラーパレットは [Catppuccin](https://github.com/catppuccin/catppuccin) をベースにしています。
+The UI color palette is based on [Catppuccin](https://github.com/catppuccin/catppuccin).
 
 > Copyright (c) 2021 Catppuccin
 > Licensed under the MIT License
 
-## ライセンス
+## License
 
-MIT License — 詳細は [LICENSE](LICENSE) を参照してください。
+MIT License — See [LICENSE](LICENSE) for details.
