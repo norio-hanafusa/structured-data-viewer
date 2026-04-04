@@ -1063,6 +1063,7 @@
       </div>
       <div class="format-tabs">
         <button class="format-tab active" data-format="json">JSON</button>
+        <button class="format-tab" data-format="jsonl">JSONL</button>
         <button class="format-tab" data-format="yaml">YAML</button>
         <button class="format-tab" data-format="xml">XML</button>
         <button class="format-tab" data-format="html">HTML</button>
@@ -1338,6 +1339,8 @@ function parseAndRender() {
       parsedData = parseXML(input);
     } else if (currentFormat === 'yaml') {
       parsedData = jsyaml.load(input);
+    } else if (currentFormat === 'jsonl') {
+      parsedData = parseJSONL(input);
     } else {
       parsedData = JSON.parse(input);
     }
@@ -1354,6 +1357,19 @@ function parseAndRender() {
     document.getElementById('statUnique').textContent = '— ユニーク';
     document.getElementById('statBytes').textContent = '— B';
   }
+}
+
+// ── JSON Lines Parser ──
+function parseJSONL(input) {
+  const lines = input.split('\n').filter(l => l.trim() !== '');
+  if (lines.length === 0) throw new Error('空のJSON Linesデータです');
+  return lines.map((line, i) => {
+    try {
+      return JSON.parse(line);
+    } catch (e) {
+      throw new Error(`行 ${i + 1}: ${e.message}`);
+    }
+  });
 }
 
 // ── XML Parser ──
@@ -1889,6 +1905,9 @@ function formatInput() {
     } else if (currentFormat === 'yaml') {
       obj = jsyaml.load(input);
       editor.value = jsyaml.dump(obj, { indent: 2 });
+    } else if (currentFormat === 'jsonl') {
+      const arr = parseJSONL(input);
+      editor.value = arr.map(item => JSON.stringify(item)).join('\n');
     } else {
       obj = JSON.parse(input);
       editor.value = JSON.stringify(obj, null, 2);
@@ -2102,7 +2121,13 @@ document.getElementById('inputEditor').addEventListener('input', () => {
   } else if (val.startsWith('<')) {
     detected = 'xml';
   } else if (val.startsWith('{') || val.startsWith('[')) {
-    detected = 'json';
+    // Detect JSONL: multiple lines each starting with { (and not a single JSON object/array)
+    const lines = val.split('\n').filter(l => l.trim() !== '');
+    if (lines.length > 1 && val.startsWith('{') && lines.every(l => l.trim().startsWith('{'))) {
+      detected = 'jsonl';
+    } else {
+      detected = 'json';
+    }
   } else if (val) {
     detected = 'yaml';
   }
@@ -2153,7 +2178,8 @@ editorWrap.addEventListener('drop', (e) => {
 
   const ext = file.name.split('.').pop().toLowerCase();
   let fmt = 'json';
-  if (ext === 'yaml' || ext === 'yml') fmt = 'yaml';
+  if (ext === 'jsonl' || ext === 'ndjson') fmt = 'jsonl';
+  else if (ext === 'yaml' || ext === 'yml') fmt = 'yaml';
   else if (ext === 'xml') fmt = 'xml';
   else if (ext === 'html' || ext === 'htm') fmt = 'html';
 
@@ -2184,8 +2210,8 @@ async function exportFile() {
     showToast('⚠ 書き出す内容がありません', true);
     return;
   }
-  const extMap  = { json: 'json', yaml: 'yaml', xml: 'xml', html: 'html' };
-  const mimeMap = { json: 'application/json', yaml: 'text/yaml', xml: 'application/xml', html: 'text/html' };
+  const extMap  = { json: 'json', jsonl: 'jsonl', yaml: 'yaml', xml: 'xml', html: 'html' };
+  const mimeMap = { json: 'application/json', jsonl: 'application/x-ndjson', yaml: 'text/yaml', xml: 'application/xml', html: 'text/html' };
   const ext  = extMap[currentFormat]  || 'txt';
   const mime = mimeMap[currentFormat] || 'text/plain';
 
@@ -2554,6 +2580,10 @@ function syncEditorFromParsedData() {
   try {
     if (currentFormat === 'json') {
       document.getElementById('inputEditor').value = JSON.stringify(parsedData, null, 2);
+    } else if (currentFormat === 'jsonl') {
+      if (Array.isArray(parsedData)) {
+        document.getElementById('inputEditor').value = parsedData.map(item => JSON.stringify(item)).join('\n');
+      }
     } else if (currentFormat === 'yaml') {
       document.getElementById('inputEditor').value = jsyaml.dump(parsedData, { indent: 2 });
     }
