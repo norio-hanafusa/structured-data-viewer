@@ -26,9 +26,18 @@ private:
     DataNode parsedData_;
     bool hasParsedData_ = false;
 
+    // Dirty / save state
+    bool dirty_ = false;
+    std::string currentFilePath_;   // empty = untitled (never saved / not from file)
+
+    // Save confirmation dialog
+    bool showSaveAlert_ = false;
+    std::function<void()> pendingAction_;
+    bool closeRequested_ = false;
+
     // UI state
     bool isDark_ = true;
-    bool showTree_ = true;   // true = tree view, false = table view
+    bool showTree_ = true;
     float leftPanelWidth_ = 450.0f;
     bool resizing_ = false;
 
@@ -60,8 +69,15 @@ private:
     void showToast(const std::string& msg, bool isError = false);
     void renderHeader();
     void renderToast();
+    void renderSaveAlert();
     void handleKeyboardShortcuts();
 
-    // Sync editor text from parsedData
     void syncEditorFromData();
+    void doSave();
+    void confirmIfDirty(std::function<void()> action);
+    void markDirty();
+
+public:
+    bool shouldClose() const { return closeRequested_ && !showSaveAlert_; }
+    void requestClose();
 };

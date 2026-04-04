@@ -101,6 +101,7 @@ App::App() {
         if (dnd::moveItem(parsedData_, src, dst, static_cast<dnd::Zone>(zone))) {
             syncEditorFromData();
             currentStats_ = stats::compute(parsedData_, editor_.text.size());
+            markDirty();
         }
     };
 
@@ -115,18 +116,21 @@ App::App() {
         parsedData_.setAt(p, std::move(val));
         syncEditorFromData();
         currentStats_ = stats::compute(parsedData_, editor_.text.size());
+        markDirty();
     };
     addDialog_.onAdd = [this](const DataNode::Path& p, const std::string& key, DataNode val) {
         pushHistory();
         parsedData_.insertAt(p, std::move(val), key);
         syncEditorFromData();
         currentStats_ = stats::compute(parsedData_, editor_.text.size());
+        markDirty();
     };
     deleteDialog_.onDelete = [this](const DataNode::Path& p) {
         pushHistory();
         parsedData_.removeAt(p);
         syncEditorFromData();
         currentStats_ = stats::compute(parsedData_, editor_.text.size());
+        markDirty();
     };
 
 }
@@ -215,6 +219,9 @@ void App::render() {
     addDialog_.render(isDark_);
     deleteDialog_.render();
 
+    // Save alert dialog
+    renderSaveAlert();
+
     // Toast
     renderToast();
 
@@ -233,11 +240,13 @@ void App::renderHeader() {
     ImGui::SameLine();
     ImGui::Spacing(); ImGui::SameLine();
 
+    if (ImGui::SmallButton("Save")) { doSave(); }
+    ImGui::SameLine();
     if (ImGui::SmallButton("Export")) { doExport(); }
     ImGui::SameLine();
-    if (ImGui::SmallButton("Sample")) { doSample(); }
+    if (ImGui::SmallButton("Sample")) { confirmIfDirty([this]() { doSample(); }); }
     ImGui::SameLine();
-    if (ImGui::SmallButton("Clear")) { doClear(); }
+    if (ImGui::SmallButton("Clear")) { confirmIfDirty([this]() { doClear(); }); }
 
     ImGui::SameLine();
     ImGui::Spacing(); ImGui::SameLine();
@@ -305,6 +314,7 @@ void App::doParse() {
         hasParsedData_ = true;
         currentStats_ = stats::compute(parsedData_, input.size());
         history_.clear();
+        markDirty();
     } catch (const std::exception& e) {
         hasParsedData_ = false;
         showToast(std::string("Parse error: ") + e.what(), true);
@@ -363,6 +373,8 @@ void App::doClear() {
     parsedData_ = DataNode();
     hasParsedData_ = false;
     currentStats_ = {};
+    currentFilePath_.clear();
+    dirty_ = false;
 }
 
 void App::doSample() {
@@ -442,24 +454,29 @@ void App::syncEditorFromData() {
 
 void App::onFileDrop(const std::vector<std::string>& paths) {
     if (paths.empty()) return;
-    const auto& path = paths[0];
 
-    auto content = fileio::readFile(path);
-    if (!content) {
-        showToast("Failed to read file", true);
-        return;
-    }
+    auto loadFile = [this, filePath = paths[0]]() {
+        auto content = fileio::readFile(filePath);
+        if (!content) {
+            showToast("Failed to read file", true);
+            return;
+        }
 
-    pushHistory();
+        pushHistory();
 
-    std::filesystem::path fp(path);
-    Format fmt = detectFormatFromExtension(fp.extension().string());
-    editor_.format = fmt;
-    editor_.text = *content;
-    editor_.fileName = fp.stem().string();
+        std::filesystem::path fp(filePath);
+        Format fmt = detectFormatFromExtension(fp.extension().string());
+        editor_.format = fmt;
+        editor_.text = *content;
+        editor_.fileName = fp.stem().string();
+        editor_.markDirty();
+        currentFilePath_ = filePath;
 
-    doParse();
-    showToast("Loaded: " + fp.filename().string());
+        doParse();
+        showToast("Loaded: " + fp.filename().string());
+    };
+
+    confirmIfDirty(loadFile);
 }
 
 void App::showToast(const std::string& msg, bool isError) {
@@ -530,5 +547,129 @@ void App::handleKeyboardShortcuts() {
         if (editDialog_.isOpen() || addDialog_.isOpen() || deleteDialog_.isOpen()) {
             ImGui::CloseCurrentPopup();
         }
+    }
+    if (ctrl && ImGui::IsKeyPressed(ImGuiKey_S)) {
+        doSave();
+    }
+}
+
+void App::markDirty() {
+    dirty_ = true;
+}
+
+void App::doSave() {
+    if (editor_.text.empty()) return;
+
+    if (!currentFilePath_.empty()) {
+        // Overwrite existing file
+        if (fileio::writeFile(currentFilePath_, editor_.text)) {
+            dirty_ = false;
+            showToast("Saved: " + std::filesystem::path(currentFilePath_).filename().string());
+        } else {
+            showToast("Save failed", true);
+        }
+    } else {
+        // Save As
+        std::string ext = formatExtension(editor_.format);
+        std::string desc = std::string(formatName(editor_.format)) + " file";
+        std::string defaultName;
+        if (!editor_.fileName.empty()) {
+            defaultName = editor_.fileName + "." + ext;
+        } else {
+            auto t = std::time(nullptr);
+            char buf[64];
+            std::strftime(buf, sizeof(buf), "%Y-%m-%d_%H-%M-%S", std::localtime(&t));
+            defaultName = std::string(buf) + "." + ext;
+        }
+        std::string path = fileio::saveFileDialog(defaultName, desc, "*." + ext);
+        if (!path.empty()) {
+            if (fileio::writeFile(path, editor_.text)) {
+                currentFilePath_ = path;
+                editor_.fileName = std::filesystem::path(path).stem().string();
+                dirty_ = false;
+                showToast("Saved: " + std::filesystem::path(path).filename().string());
+            } else {
+                showToast("Save failed", true);
+            }
+        }
+    }
+}
+
+void App::confirmIfDirty(std::function<void()> action) {
+    if (dirty_) {
+        pendingAction_ = std::move(action);
+        showSaveAlert_ = true;
+    } else {
+        action();
+    }
+}
+
+void App::requestClose() {
+    if (dirty_) {
+        pendingAction_ = [this]() { closeRequested_ = true; };
+        showSaveAlert_ = true;
+    } else {
+        closeRequested_ = true;
+    }
+}
+
+void App::renderSaveAlert() {
+    if (!showSaveAlert_) return;
+
+    if (!ImGui::IsPopupOpen("Unsaved Changes"))
+        ImGui::OpenPopup("Unsaved Changes");
+
+    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+    float dlgW = ImGui::GetMainViewport()->WorkSize.x * 0.25f;
+    ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(dlgW, 0), ImGuiCond_Always);
+
+    if (ImGui::BeginPopupModal("Unsaved Changes", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("You have unsaved changes.");
+        ImGui::Text("Do you want to save before continuing?");
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        float bw = ImGui::CalcTextSize("Don't Save").x + ImGui::GetStyle().FramePadding.x * 2 + 8.0f;
+        float spacing = ImGui::GetStyle().ItemSpacing.x;
+        float total = bw * 3 + spacing * 2;
+        ImGui::SetCursorPosX((ImGui::GetWindowSize().x - total) * 0.5f);
+
+        // Save button - blue/accent
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.4f, 0.8f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.5f, 0.9f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.15f, 0.3f, 0.7f, 1.0f));
+        if (ImGui::Button("Save", ImVec2(bw, 0))) {
+            doSave();
+            if (!dirty_ && pendingAction_) {
+                pendingAction_();
+            }
+            pendingAction_ = nullptr;
+            showSaveAlert_ = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::PopStyleColor(3);
+        ImGui::SameLine();
+        // Don't Save button - red
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.7f, 0.15f, 0.15f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.85f, 0.25f, 0.25f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
+        if (ImGui::Button("Don't Save", ImVec2(bw, 0))) {
+            if (pendingAction_) pendingAction_();
+            pendingAction_ = nullptr;
+            showSaveAlert_ = false;
+            dirty_ = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::PopStyleColor(3);
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(bw, 0))) {
+            pendingAction_ = nullptr;
+            showSaveAlert_ = false;
+            closeRequested_ = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
     }
 }

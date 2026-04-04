@@ -30,6 +30,13 @@ static void glfwDropCallback(GLFWwindow* /*window*/, int count, const char** pat
     }
 }
 
+static void glfwCloseCallback(GLFWwindow* window) {
+    if (g_app) {
+        glfwSetWindowShouldClose(window, GLFW_FALSE); // Cancel the close
+        g_app->requestClose();
+    }
+}
+
 int main(int /*argc*/, char** /*argv*/) {
     g_log = fopen("C:\\Users\\hanaf\\Downloads\\sdv_debug.txt", "w");
     dbg("1: main entered");
@@ -63,6 +70,7 @@ int main(int /*argc*/, char** /*argv*/) {
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
     glfwSetDropCallback(window, glfwDropCallback);
+    glfwSetWindowCloseCallback(window, glfwCloseCallback);
     dbg("5: context made current");
 
     // Print OpenGL version
@@ -122,7 +130,7 @@ int main(int /*argc*/, char** /*argv*/) {
     dbg("8: App created, entering loop");
 
     int frameCount = 0;
-    while (!glfwWindowShouldClose(window)) {
+    while (!glfwWindowShouldClose(window) && !app.shouldClose()) {
         glfwPollEvents();
 
         ImGui_ImplOpenGL3_NewFrame();
