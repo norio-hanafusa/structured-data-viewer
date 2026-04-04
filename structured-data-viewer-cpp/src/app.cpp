@@ -229,10 +229,42 @@ void App::renderHeader() {
     ImGui::Text("Structured Data Viewer");
     ImGui::PopStyleColor();
 
-    // Theme toggle button (right-aligned)
-    float buttonW = ImGui::CalcTextSize(isDark_ ? "Light" : "Dark").x + ImGui::GetStyle().FramePadding.x * 2;
-    ImGui::SameLine(ImGui::GetContentRegionMax().x - buttonW);
-    if (ImGui::Button(isDark_ ? "Light" : "Dark")) {
+    // Action buttons on the same line as title
+    ImGui::SameLine();
+    ImGui::Spacing(); ImGui::SameLine();
+
+    if (ImGui::SmallButton("Export")) { doExport(); }
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Sample")) { doSample(); }
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Clear")) { doClear(); }
+
+    ImGui::SameLine();
+    ImGui::Spacing(); ImGui::SameLine();
+
+    {
+        char label[64];
+        snprintf(label, sizeof(label), "Undo(%d)", history_.undoCount());
+        bool disabled = (history_.undoCount() <= 0);
+        if (disabled) ImGui::BeginDisabled();
+        if (ImGui::SmallButton(label)) { doUndo(); }
+        if (disabled) ImGui::EndDisabled();
+    }
+    ImGui::SameLine();
+    {
+        char label[64];
+        snprintf(label, sizeof(label), "Redo(%d)", history_.redoCount());
+        bool disabled = (history_.redoCount() <= 0);
+        if (disabled) ImGui::BeginDisabled();
+        if (ImGui::SmallButton(label)) { doRedo(); }
+        if (disabled) ImGui::EndDisabled();
+    }
+
+    // Theme toggle (right-aligned)
+    ImGui::SameLine();
+    float themeW = ImGui::CalcTextSize(isDark_ ? "Light" : "Dark").x + ImGui::GetStyle().FramePadding.x * 2;
+    ImGui::SameLine(ImGui::GetContentRegionMax().x - themeW);
+    if (ImGui::SmallButton(isDark_ ? "Light" : "Dark")) {
         isDark_ = !isDark_;
         if (isDark_)
             theme::applyMocha(ImGui::GetStyle());
@@ -240,7 +272,7 @@ void App::renderHeader() {
             theme::applyLatte(ImGui::GetStyle());
     }
 
-    // Stats (second row, right-aligned)
+    // Stats on second row
     if (hasParsedData_) {
         char statsBuf[256];
         snprintf(statsBuf, sizeof(statsBuf), "%d keys | depth %d | %d nodes | %d unique | %s",
@@ -248,8 +280,11 @@ void App::renderHeader() {
             currentStats_.nodeCount, currentStats_.uniqueKeyCount,
             stats::formatBytes(currentStats_.byteSize).c_str());
         float statsW = ImGui::CalcTextSize(statsBuf).x;
-        ImGui::SameLine(ImGui::GetContentRegionMax().x - buttonW - statsW - ImGui::GetStyle().ItemSpacing.x);
-        ImGui::TextDisabled("%s", statsBuf);
+        float rightX = ImGui::GetContentRegionMax().x - statsW;
+        if (rightX > 0) {
+            ImGui::SameLine(rightX);
+            ImGui::TextDisabled("%s", statsBuf);
+        }
     }
 
     ImGui::Separator();
@@ -324,6 +359,7 @@ void App::doClear() {
     pushHistory();
     editor_.text.clear();
     editor_.fileName.clear();
+    editor_.markDirty();
     parsedData_ = DataNode();
     hasParsedData_ = false;
     currentStats_ = {};
@@ -338,6 +374,7 @@ void App::doSample() {
         case Format::XML:   editor_.text = kSampleXML;   break;
         case Format::HTML:  editor_.text = kSampleHTML;   break;
     }
+    editor_.markDirty();
     doParse();
 }
 
@@ -351,6 +388,7 @@ void App::doUndo() {
         editor_.text = std::move(snap->editorText);
         editor_.format = snap->format;
         editor_.fileName = std::move(snap->fileName);
+        editor_.markDirty();
         hasParsedData_ = parsedData_.type() != NodeType::Null || parsedData_.isContainer();
         if (hasParsedData_)
             currentStats_ = stats::compute(parsedData_, editor_.text.size());
@@ -367,6 +405,7 @@ void App::doRedo() {
         editor_.text = std::move(snap->editorText);
         editor_.format = snap->format;
         editor_.fileName = std::move(snap->fileName);
+        editor_.markDirty();
         hasParsedData_ = parsedData_.type() != NodeType::Null || parsedData_.isContainer();
         if (hasParsedData_)
             currentStats_ = stats::compute(parsedData_, editor_.text.size());
@@ -395,9 +434,9 @@ void App::syncEditorFromData() {
                 editor_.text = parsers::serializeYAML(parsedData_);
                 break;
             default:
-                // XML/HTML: re-serialization from tree is complex, skip
                 break;
         }
+        editor_.markDirty();
     } catch (...) {}
 }
 

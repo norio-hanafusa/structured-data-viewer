@@ -28,6 +28,8 @@ public:
     int redoCount = 0;
     std::string fileName;
 
+    void markDirty() { bufDirty_ = true; }
+
 private:
     static constexpr size_t kMaxBufSize = 4 * 1024 * 1024; // 4MB
     std::vector<char> buf_;  // heap-allocated buffer

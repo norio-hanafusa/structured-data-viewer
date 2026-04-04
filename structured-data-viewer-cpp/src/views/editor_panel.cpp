@@ -89,7 +89,6 @@ void EditorPanel::renderFormatTabs() {
 }
 
 void EditorPanel::renderActionButtons() {
-    // Parse button (primary action)
     if (ImGui::Button("Parse (Ctrl+Enter)")) {
         if (onParse) onParse();
     }
@@ -98,52 +97,5 @@ void EditorPanel::renderActionButtons() {
     if (ImGui::Button("Format")) {
         if (onFormat) onFormat();
         bufDirty_ = true;
-    }
-
-    ImGui::SameLine();
-    if (ImGui::Button("Export")) {
-        if (onExport) onExport();
-    }
-
-    ImGui::SameLine();
-    if (ImGui::Button("Sample")) {
-        if (onSample) onSample();
-        bufDirty_ = true;
-    }
-
-    ImGui::SameLine();
-    if (ImGui::Button("Clear")) {
-        if (onClear) onClear();
-        bufDirty_ = true;
-    }
-
-    ImGui::SameLine();
-
-    // Undo with count
-    {
-        char label[64];
-        snprintf(label, sizeof(label), "Undo (%d)", undoCount);
-        bool disabled = (undoCount <= 0);
-        if (disabled) ImGui::BeginDisabled();
-        if (ImGui::Button(label)) {
-            if (onUndo) onUndo();
-            bufDirty_ = true;
-        }
-        if (disabled) ImGui::EndDisabled();
-    }
-
-    ImGui::SameLine();
-
-    // Redo with count
-    {
-        char label[64];
-        snprintf(label, sizeof(label), "Redo (%d)", redoCount);
-        bool disabled = (redoCount <= 0);
-        if (disabled) ImGui::BeginDisabled();
-        if (ImGui::Button(label)) {
-            if (onRedo) onRedo();
-            bufDirty_ = true;
-        }
-        if (disabled) ImGui::EndDisabled();
     }
 }
